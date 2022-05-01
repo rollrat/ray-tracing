@@ -144,7 +144,7 @@ int main() {
   // Image
 
   const auto aspect_ratio = 16.0 / 9.0;
-  const int image_width = 400;
+  const int image_width = 1200;
   const int image_height = static_cast<int>(image_width / aspect_ratio);
   const int samples_per_pixel = 100;
   const int max_depth = 50;
@@ -186,6 +186,8 @@ int main() {
 
   for (int j = image_height - 1; j >= 0; --j) {
     std::cerr << "\rScanlines remaining: " << j << ' ' << std::flush;
+    color colors[image_width];
+#pragma omp parallel for
     for (int i = 0; i < image_width; ++i) {
       //   auto u = double(i) / (image_width - 1);
       //   auto v = double(j) / (image_height - 1);
@@ -199,7 +201,11 @@ int main() {
         ray r = cam.get_ray(u, v);
         pixel_color += ray_color_material(r, world, max_depth);
       }
-      write_color(std::cout, pixel_color, samples_per_pixel);
+      colors[i] = pixel_color;
+    }
+
+    for (int i = 0; i < image_width; ++i) {
+      write_color(std::cout, colors[i], samples_per_pixel);
     }
   }
 
