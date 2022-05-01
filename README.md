@@ -1,6 +1,7 @@
 # Ray Tracing on One Weekend Pratice
 
-https://raytracing.github.io/books/RayTracingInOneWeekend.html
+ - [x] https://raytracing.github.io/books/RayTracingInOneWeekend.html
+ - [] https://raytracing.github.io/books/RayTracingTheNextWeek.html
 
 ## init
 
@@ -18,3 +19,4 @@ convert a.ppm a.png
 ![](dielectric2.png)
 ![](cameraps.png)
 ![](camerapszoom.png)
+![](aspecture.png)
