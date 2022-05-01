@@ -6,6 +6,25 @@
 
 using std::sqrt;
 
+#include <cstdlib>
+#include <random>
+
+// inline double random_double() {
+//   // Returns a random real in [0,1).
+//   return rand() / (RAND_MAX + 1.0);
+// }
+
+inline double random_double() {
+  static std::uniform_real_distribution<double> distribution(0.0, 1.0);
+  static std::mt19937 generator;
+  return distribution(generator);
+}
+
+inline double random_double(double min, double max) {
+  // Returns a random real in [min,max).
+  return min + (max - min) * random_double();
+}
+
 class vec3 {
 public:
   double e[3];
@@ -41,6 +60,15 @@ public:
 
   double length_squared() const {
     return e[0] * e[0] + e[1] * e[1] + e[2] * e[2];
+  }
+
+  inline static vec3 random() {
+    return vec3(random_double(), random_double(), random_double());
+  }
+
+  inline static vec3 random(double min, double max) {
+    return vec3(random_double(min, max), random_double(min, max),
+                random_double(min, max));
   }
 };
 
@@ -224,25 +252,6 @@ inline double degrees_to_radians(double degrees) {
   return degrees * pi / 180.0;
 }
 
-#include <cstdlib>
-#include <random>
-
-// inline double random_double() {
-//   // Returns a random real in [0,1).
-//   return rand() / (RAND_MAX + 1.0);
-// }
-
-inline double random_double() {
-  static std::uniform_real_distribution<double> distribution(0.0, 1.0);
-  static std::mt19937 generator;
-  return distribution(generator);
-}
-
-inline double random_double(double min, double max) {
-  // Returns a random real in [min,max).
-  return min + (max - min) * random_double();
-}
-
 class camera {
 public:
   camera() {
@@ -285,14 +294,30 @@ void write_color(std::ostream &out, color pixel_color, int samples_per_pixel) {
 
   // Divide the color by the number of samples.
   auto scale = 1.0 / samples_per_pixel;
-  r *= scale;
-  g *= scale;
-  b *= scale;
+  // r *= scale;
+  // g *= scale;
+  // b *= scale;
+  // Divide the color by the number of samples and gamma-correct for gamma=2.0.
+  r = sqrt(scale * r);
+  g = sqrt(scale * g);
+  b = sqrt(scale * b);
 
   // Write the translated [0,255] value of each color component.
   out << static_cast<int>(256 * clamp(r, 0.0, 0.999)) << ' '
       << static_cast<int>(256 * clamp(g, 0.0, 0.999)) << ' '
       << static_cast<int>(256 * clamp(b, 0.0, 0.999)) << '\n';
 }
+
+// 랜덤으로 구 형태로 뻗어나가는 벡터
+vec3 random_in_unit_sphere() {
+  while (true) {
+    auto p = vec3::random(-1, 1);
+    if (p.length_squared() >= 1)
+      continue;
+    return p;
+  }
+}
+
+vec3 random_unit_vector() { return unit_vector(random_in_unit_sphere()); }
 
 #endif
