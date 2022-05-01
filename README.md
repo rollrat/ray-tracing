@@ -1,4 +1,4 @@
-# Lay Tracing on One Weekend Pratice
+# Ray Tracing on One Weekend Pratice
 
 https://raytracing.github.io/books/RayTracingInOneWeekend.html
 
@@ -10,3 +10,8 @@ g++ main.cpp -fopenmp
 ./a.out > a.ppm
 convert a.ppm a.png
 ```
+
+## image
+
+![](diffuse.png)
+![](shiny-metal.png)
