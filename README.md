@@ -20,3 +20,4 @@ convert a.ppm a.png
 ![](cameraps.png)
 ![](camerapszoom.png)
 ![](aspecture.png)
+![](final.png)

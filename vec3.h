@@ -271,11 +271,20 @@ inline double degrees_to_radians(double degrees) {
   return degrees * pi / 180.0;
 }
 
+vec3 random_in_unit_disk() {
+  while (true) {
+    auto p = vec3(random_double(-1, 1), random_double(-1, 1), 0);
+    if (p.length_squared() >= 1)
+      continue;
+    return p;
+  }
+}
+
 class camera {
 public:
   camera(point3 lookfrom, point3 lookat, vec3 vup,
          double vfov, // vertical field-of-view in degrees
-         double aspect_ratio) {
+         double aspect_ratio, double aperture, double focus_dist) {
     auto theta = degrees_to_radians(vfov);
     // theta는 카메라가 보는 위 아래의 각도를 설정한다.
     // theta가 45도 라면 카메라는 정확히 90도 만큼의 이미지를 캡쳐한다.
@@ -292,18 +301,20 @@ public:
     //     origin - horizontal / 2 - vertical / 2 - vec3(0, 0, focal_length);
 
     // 카메라가 보고있는 방향의 반대 방향 벡터
-    auto w = unit_vector(lookfrom - lookat);
+    w = unit_vector(lookfrom - lookat);
     // 업벡터와 w 벡터 두 개는 평면을 만드며, 이 평면의 법선 벡터가 u벡터가 됨
     // u벡터는 업벡터와 w벡터의 교차점을 지난다.
     // 카메라의 오른쪽 방향으로 나아감
-    auto u = unit_vector(cross(vup, w));
+    u = unit_vector(cross(vup, w));
     // 카메라의 위쪽 방향으로 나아감
-    auto v = cross(w, u);
+    v = cross(w, u);
 
     origin = lookfrom;
-    horizontal = viewport_width * u;
-    vertical = viewport_height * v;
-    lower_left_corner = origin - horizontal / 2 - vertical / 2 - w;
+    horizontal = focus_dist * viewport_width * u;
+    vertical = focus_dist * viewport_height * v;
+    lower_left_corner = origin - horizontal / 2 - vertical / 2 - focus_dist * w;
+
+    lens_radius = aperture / 2;
   }
 
   // ray get_ray(double u, double v) const {
@@ -311,9 +322,17 @@ public:
   //              lower_left_corner + u * horizontal + v * vertical - origin);
   // }
 
+  // ray get_ray(double s, double t) const {
+  //   return ray(origin,
+  //              lower_left_corner + s * horizontal + t * vertical - origin);
+  // }
+
   ray get_ray(double s, double t) const {
-    return ray(origin,
-               lower_left_corner + s * horizontal + t * vertical - origin);
+    vec3 rd = lens_radius * random_in_unit_disk();
+    vec3 offset = u * rd.x() + v * rd.y();
+
+    return ray(origin + offset, lower_left_corner + s * horizontal +
+                                    t * vertical - origin - offset);
   }
 
 private:
@@ -321,6 +340,8 @@ private:
   point3 lower_left_corner;
   vec3 horizontal;
   vec3 vertical;
+  vec3 u, v, w;
+  double lens_radius;
 };
 
 inline double clamp(double x, double min, double max) {
