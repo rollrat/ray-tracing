@@ -273,22 +273,47 @@ inline double degrees_to_radians(double degrees) {
 
 class camera {
 public:
-  camera() {
-    auto aspect_ratio = 16.0 / 9.0;
-    auto viewport_height = 2.0;
+  camera(point3 lookfrom, point3 lookat, vec3 vup,
+         double vfov, // vertical field-of-view in degrees
+         double aspect_ratio) {
+    auto theta = degrees_to_radians(vfov);
+    // theta는 카메라가 보는 위 아래의 각도를 설정한다.
+    // theta가 45도 라면 카메라는 정확히 90도 만큼의 이미지를 캡쳐한다.
+    auto h = tan(theta / 2);
+    auto viewport_height = 2.0 * h;
     auto viewport_width = aspect_ratio * viewport_height;
-    auto focal_length = 1.0;
 
-    origin = point3(0, 0, 0);
-    horizontal = vec3(viewport_width, 0.0, 0.0);
-    vertical = vec3(0.0, viewport_height, 0.0);
-    lower_left_corner =
-        origin - horizontal / 2 - vertical / 2 - vec3(0, 0, focal_length);
+    // auto focal_length = 1.0;
+
+    // origin = point3(0, 0, 0);
+    // horizontal = vec3(viewport_width, 0.0, 0.0);
+    // vertical = vec3(0.0, viewport_height, 0.0);
+    // lower_left_corner =
+    //     origin - horizontal / 2 - vertical / 2 - vec3(0, 0, focal_length);
+
+    // 카메라가 보고있는 방향의 반대 방향 벡터
+    auto w = unit_vector(lookfrom - lookat);
+    // 업벡터와 w 벡터 두 개는 평면을 만드며, 이 평면의 법선 벡터가 u벡터가 됨
+    // u벡터는 업벡터와 w벡터의 교차점을 지난다.
+    // 카메라의 오른쪽 방향으로 나아감
+    auto u = unit_vector(cross(vup, w));
+    // 카메라의 위쪽 방향으로 나아감
+    auto v = cross(w, u);
+
+    origin = lookfrom;
+    horizontal = viewport_width * u;
+    vertical = viewport_height * v;
+    lower_left_corner = origin - horizontal / 2 - vertical / 2 - w;
   }
 
-  ray get_ray(double u, double v) const {
+  // ray get_ray(double u, double v) const {
+  //   return ray(origin,
+  //              lower_left_corner + u * horizontal + v * vertical - origin);
+  // }
+
+  ray get_ray(double s, double t) const {
     return ray(origin,
-               lower_left_corner + u * horizontal + v * vertical - origin);
+               lower_left_corner + s * horizontal + t * vertical - origin);
   }
 
 private:
@@ -388,6 +413,50 @@ public:
 public:
   color albedo;
   double fuzz;
+};
+
+// 굴절 함수
+vec3 refract(const vec3 &uv, const vec3 &n, double etai_over_etat) {
+  // uv와 n이 unit vector이기 때문
+  // a dot b = |a||b| cos theta
+  auto cos_theta = fmin(dot(-uv, n), 1.0);
+  // 법선 n과 수직인 벡터
+  vec3 r_out_perp = etai_over_etat * (uv + cos_theta * n);
+  // 법선 n과 평행인 벡터
+  vec3 r_out_parallel = -sqrt(fabs(1.0 - r_out_perp.length_squared())) * n;
+  // 두 개를 합하면 굴절 벡터가 나온다.
+  return r_out_perp + r_out_parallel;
+}
+
+// 유전체
+class dielectric : public material {
+public:
+  dielectric(double index_of_refraction) : ir(index_of_refraction) {}
+
+  virtual bool scatter(const ray &r_in, const hit_record &rec,
+                       color &attenuation, ray &scattered) const override {
+    attenuation = color(1.0, 1.0, 1.0);
+    double refraction_ratio = rec.front_face ? (1.0 / ir) : ir;
+
+    vec3 unit_direction = unit_vector(r_in.direction());
+    double cos_theta = fmin(dot(-unit_direction, rec.normal), 1.0);
+    double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+    vec3 direction;
+
+    // 입사각이 너무 크다면 반사해야함
+    if (cannot_refract)
+      direction = reflect(unit_direction, rec.normal);
+    else
+      direction = refract(unit_direction, rec.normal, refraction_ratio);
+
+    scattered = ray(rec.p, direction);
+    return true;
+  }
+
+public:
+  double ir; // Index of Refraction
 };
 
 #endif

@@ -15,3 +15,6 @@ convert a.ppm a.png
 
 ![](diffuse.png)
 ![](shiny-metal.png)
+![](dielectric.png)
+![](cameraps.png)
+![](camerapszoom.png)
