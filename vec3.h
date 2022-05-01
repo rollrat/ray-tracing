@@ -9,6 +9,12 @@ using std::sqrt;
 #include <cstdlib>
 #include <random>
 
+#include <memory>
+#include <vector>
+
+using std::make_shared;
+using std::shared_ptr;
+
 // inline double random_double() {
 //   // Returns a random real in [0,1).
 //   return rand() / (RAND_MAX + 1.0);
@@ -69,6 +75,12 @@ public:
   inline static vec3 random(double min, double max) {
     return vec3(random_double(min, max), random_double(min, max),
                 random_double(min, max));
+  }
+
+  bool near_zero() const {
+    // Return true if the vector is close to zero in all dimensions.
+    const auto s = 1e-8;
+    return (fabs(e[0]) < s) && (fabs(e[1]) < s) && (fabs(e[2]) < s);
   }
 };
 
@@ -134,6 +146,7 @@ public:
   vec3 dir;
 };
 
+class material;
 struct hit_record {
   // 어떤 지점에서 물체와 만났는지?
   point3 p;
@@ -141,6 +154,7 @@ struct hit_record {
   vec3 normal;
   // ray의 t값
   double t;
+  shared_ptr<material> mat_ptr;
 
   // 광선이 겉면을 때리고 바깥으로 나간경우
   bool front_face;
@@ -163,6 +177,8 @@ class sphere : public hittable {
 public:
   sphere() {}
   sphere(point3 cen, double r) : center(cen), radius(r){};
+  sphere(point3 cen, double r, shared_ptr<material> m)
+      : center(cen), radius(r), mat_ptr(m){};
 
   virtual bool hit(const ray &r, double t_min, double t_max,
                    hit_record &rec) const override;
@@ -170,6 +186,7 @@ public:
 public:
   point3 center;
   double radius;
+  shared_ptr<material> mat_ptr;
 };
 
 bool sphere::hit(const ray &r, double t_min, double t_max,
@@ -199,15 +216,10 @@ bool sphere::hit(const ray &r, double t_min, double t_max,
   rec.p = r.at(rec.t);
   vec3 outward_normal = (rec.p - center) / radius;
   rec.set_face_normal(r, outward_normal);
+  rec.mat_ptr = mat_ptr;
 
   return true;
 }
-
-#include <memory>
-#include <vector>
-
-using std::make_shared;
-using std::shared_ptr;
 
 class hittable_list : public hittable {
 public:
@@ -319,5 +331,54 @@ vec3 random_in_unit_sphere() {
 }
 
 vec3 random_unit_vector() { return unit_vector(random_in_unit_sphere()); }
+
+class material {
+public:
+  virtual bool scatter(const ray &r_in, const hit_record &rec,
+                       color &attenuation, ray &scattered) const = 0;
+};
+
+vec3 reflect(const vec3 &v, const vec3 &n) {
+  // v는 직사광
+  // n은 법선
+  // 리턴하는 것은 법선 벡터에 대한 반사 벡터임
+  return v - 2 * dot(v, n) * n;
+}
+
+class lambertian : public material {
+public:
+  lambertian(const color &a) : albedo(a) {}
+
+  virtual bool scatter(const ray &r_in, const hit_record &rec,
+                       color &attenuation, ray &scattered) const override {
+    auto scatter_direction = rec.normal + random_unit_vector();
+
+    // Catch degenerate scatter direction
+    if (scatter_direction.near_zero())
+      scatter_direction = rec.normal;
+    scattered = ray(rec.p, scatter_direction);
+    attenuation = albedo;
+    return true;
+  }
+
+public:
+  color albedo;
+};
+
+class metal : public material {
+public:
+  metal(const color &a) : albedo(a) {}
+
+  virtual bool scatter(const ray &r_in, const hit_record &rec,
+                       color &attenuation, ray &scattered) const override {
+    vec3 reflected = reflect(unit_vector(r_in.direction()), rec.normal);
+    scattered = ray(rec.p, reflected);
+    attenuation = albedo;
+    return (dot(scattered.direction(), rec.normal) > 0);
+  }
+
+public:
+  color albedo;
+};
 
 #endif
