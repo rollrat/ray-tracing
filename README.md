@@ -1,7 +1,7 @@
 # Ray Tracing on One Weekend Pratice
 
  - [x] https://raytracing.github.io/books/RayTracingInOneWeekend.html
- - [] https://raytracing.github.io/books/RayTracingTheNextWeek.html
+ - [ ] https://raytracing.github.io/books/RayTracingTheNextWeek.html
 
 ## init
 
