@@ -43,52 +43,83 @@
 // 따라서 t값을 알면 어떤 점에서 부딪혔는지 알 수 있다.
 double hit_sphere(const point3 &center, double radius, const ray &r) {
   vec3 oc = r.origin() - center;
-  auto a = dot(r.direction(), r.direction());
-  auto b = 2.0 * dot(oc, r.direction());
-  auto c = dot(oc, oc) - radius * radius;
-  auto discriminant = b * b - 4 * a * c;
+  //   auto a = dot(r.direction(), r.direction());
+  //   auto b = 2.0 * dot(oc, r.direction());
+  //   auto c = dot(oc, oc) - radius * radius;
+  //   auto discriminant = b * b - 4 * a * c;
+  //   if (discriminant < 0) {
+  //     return -1.0;
+  //   } else {
+  //     return (-b - sqrt(discriminant)) / (2.0 * a);
+  //   }
+
+  // b가 2h이므로 2를 곱하지 않는 다면 ...
+  auto a = r.direction().length_squared();
+  auto half_b = dot(oc, r.direction());
+  auto c = oc.length_squared() - radius * radius;
+  auto discriminant = half_b * half_b - a * c;
+
   if (discriminant < 0) {
     return -1.0;
   } else {
-    return (-b - sqrt(discriminant)) / (2.0 * a);
+    return (-half_b - sqrt(discriminant)) / a;
   }
 }
 
-color ray_color(const ray &r) {
-  auto t = hit_sphere(point3(0, 0, -1), 0.5, r);
-  if (t > 0.0) {
-    // 구의 중심 점이 (0, 0, -1)임
-    // z가 음수 인곳이 카메라보다 앞 쪽에 있는 곳
-    /*
-                    +y
-                    |
-                    |        /
-                    |    
-                    |    /
-                    |  
-                    |/
-       -   -   -   /-------------- +x
-                 /  |
-               /
-             /      |
-            +z
-    */
-    // 구와 부딪히는 곳의 법선 벡터
-    // 구와 부딪히는 곳과 수직인 벡터
-    vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
-    return 0.5 * color(N.x() + 1, N.y() + 1, N.z() + 1);
+// color ray_color(const ray &r) {
+//   auto t = hit_sphere(point3(0, 0, -1), 0.5, r);
+//   if (t > 0.0) {
+//     // 구의 중심 점이 (0, 0, -1)임
+//     // z가 음수 인곳이 카메라보다 앞 쪽에 있는 곳
+//     /*
+//                     +y
+//                     |
+//                     |        /
+//                     |
+//                     |    /
+//                     |
+//                     |/
+//        -   -   -   /-------------- +x
+//                  /  |
+//                /
+//              /      |
+//             +z
+//     */
+//     // 구와 부딪히는 곳의 법선 벡터
+//     // 구와 부딪히는 곳과 수직인 벡터
+//     vec3 N = unit_vector(r.at(t) - vec3(0, 0, -1));
+//     return 0.5 * color(N.x() + 1, N.y() + 1, N.z() + 1);
+//   }
+//   vec3 unit_direction = unit_vector(r.direction());
+//   t = 0.5 * (unit_direction.y() + 1.0);
+//   return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
+// }
+
+color ray_color(const ray &r, const hittable &world) {
+  hit_record rec;
+  if (world.hit(r, 0, infinity, rec)) {
+    return 0.5 * (rec.normal + color(1, 1, 1));
   }
   vec3 unit_direction = unit_vector(r.direction());
-  t = 0.5 * (unit_direction.y() + 1.0);
+  auto t = 0.5 * (unit_direction.y() + 1.0);
   return (1.0 - t) * color(1.0, 1.0, 1.0) + t * color(0.5, 0.7, 1.0);
 }
 
 int main() {
 
   // Image
+
   const auto aspect_ratio = 16.0 / 9.0;
   const int image_width = 400;
   const int image_height = static_cast<int>(image_width / aspect_ratio);
+
+  // World
+
+  hittable_list world;
+  // 카메라 앞에 있는 구
+  world.add(make_shared<sphere>(point3(0, 0, -1), 0.5));
+  // 카메라 앞이지만 100 만큼 밑에 있는 존나 큰 구
+  world.add(make_shared<sphere>(point3(0, -100.5, -1), 100));
 
   // Camera
 
@@ -103,7 +134,6 @@ int main() {
       origin - horizontal / 2 - vertical / 2 - vec3(0, 0, focal_length);
 
   // Render
-
   std::cout << "P3\n" << image_width << " " << image_height << "\n255\n";
 
   for (int j = image_height - 1; j >= 0; --j) {
@@ -112,7 +142,7 @@ int main() {
       auto u = double(i) / (image_width - 1);
       auto v = double(j) / (image_height - 1);
       ray r(origin, lower_left_corner + u * horizontal + v * vertical - origin);
-      color pixel_color = ray_color(r);
+      color pixel_color = ray_color(r, world);
       write_color(std::cout, pixel_color);
     }
   }

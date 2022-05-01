@@ -106,4 +106,122 @@ public:
   vec3 dir;
 };
 
+struct hit_record {
+  // 어떤 지점에서 물체와 만났는지?
+  point3 p;
+  // 그 물체와 만난 지점에서의 법선 벡터
+  vec3 normal;
+  // ray의 t값
+  double t;
+
+  // 광선이 겉면을 때리고 바깥으로 나간경우
+  bool front_face;
+
+  inline void set_face_normal(const ray &r, const vec3 &outward_normal) {
+    // 법선과 광선이 같은 방향이라면 내부임 (내적이 0보다 크면)
+    //             다른 방향이라면 외부임 (내적이 0보다 작으면)
+    front_face = dot(r.direction(), outward_normal) < 0;
+    normal = front_face ? outward_normal : -outward_normal;
+  }
+};
+
+class hittable {
+public:
+  virtual bool hit(const ray &r, double t_min, double t_max,
+                   hit_record &rec) const = 0;
+};
+
+class sphere : public hittable {
+public:
+  sphere() {}
+  sphere(point3 cen, double r) : center(cen), radius(r){};
+
+  virtual bool hit(const ray &r, double t_min, double t_max,
+                   hit_record &rec) const override;
+
+public:
+  point3 center;
+  double radius;
+};
+
+bool sphere::hit(const ray &r, double t_min, double t_max,
+                 hit_record &rec) const {
+  vec3 oc = r.origin() - center;
+  auto a = r.direction().length_squared();
+  auto half_b = dot(oc, r.direction());
+  auto c = oc.length_squared() - radius * radius;
+
+  auto discriminant = half_b * half_b - a * c;
+  if (discriminant < 0)
+    return false;
+  auto sqrtd = sqrt(discriminant);
+
+  // Find the nearest root that lies in the acceptable range.
+  // 더 가까운 t값을 찾기 위함임.
+  // 구의 경우를 보면 광선이 구를 관통하면 하나 또는 두 개의 점과 접촉하는데,
+  // 두 개의 점을 접촉하는 경우 더 가까운 하나만 가져와야함
+  auto root = (-half_b - sqrtd) / a;
+  if (root < t_min || t_max < root) {
+    root = (-half_b + sqrtd) / a;
+    if (root < t_min || t_max < root)
+      return false;
+  }
+
+  rec.t = root;
+  rec.p = r.at(rec.t);
+  vec3 outward_normal = (rec.p - center) / radius;
+  rec.set_face_normal(r, outward_normal);
+
+  return true;
+}
+
+#include <memory>
+#include <vector>
+
+using std::make_shared;
+using std::shared_ptr;
+
+class hittable_list : public hittable {
+public:
+  hittable_list() {}
+  hittable_list(shared_ptr<hittable> object) { add(object); }
+
+  void clear() { objects.clear(); }
+  void add(shared_ptr<hittable> object) { objects.push_back(object); }
+
+  virtual bool hit(const ray &r, double t_min, double t_max,
+                   hit_record &rec) const override;
+
+public:
+  std::vector<shared_ptr<hittable>> objects;
+};
+
+// 어떤 물체든지 한 번이라도 부딪힌다면...
+// 광선과 가장 가깝게 부딪힌 물체의 record를 가져온다.
+bool hittable_list::hit(const ray &r, double t_min, double t_max,
+                        hit_record &rec) const {
+  hit_record temp_rec;
+  bool hit_anything = false;
+  auto closest_so_far = t_max;
+
+  for (const auto &object : objects) {
+    if (object->hit(r, t_min, closest_so_far, temp_rec)) {
+      hit_anything = true;
+      closest_so_far = temp_rec.t;
+      rec = temp_rec;
+    }
+  }
+
+  return hit_anything;
+}
+
+#include <limits>
+
+const double infinity = std::numeric_limits<double>::infinity();
+const double pi = 3.1415926535897932385;
+
+inline double degrees_to_radians(double degrees) {
+  return degrees * pi / 180.0;
+}
+
 #endif
